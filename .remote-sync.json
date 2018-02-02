@@ -1,0 +1,16 @@
+{
+  "uploadOnSave": true,
+  "useAtomicWrites": false,
+  "deleteLocal": false,
+  "hostname": "orcrist-30.cs.utexas.edu",
+  "port": "22",
+  "target": "/u/ghellis",
+  "ignore": [
+    ".remote-sync.json",
+    ".git/**"
+  ],
+  "username": "ghellis",
+  "password": "1973mgb!",
+  "watch": [],
+  "transport": "scp"
+}
