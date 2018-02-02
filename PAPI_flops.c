@@ -15,30 +15,33 @@
 #include <malloc.h>
 #include "papi.h"
 
+// TODO: this index must be variable over matrix sizes
 #define INDEX 100
-
-// TODO: iterate over matrix sizes
 
 static void test_fail(char *file, int line, char *call, int retval);
 
 int main(int argc, char **argv) {
   extern void dummy(void *);
+  // TODO: change to doubles
   float matrixa[INDEX][INDEX], matrixb[INDEX][INDEX], mresult[INDEX][INDEX];
   float real_time, proc_time, mflops;
   long long flpins;
   int retval;
   int i,j,k;
 
+  // TODO: Clear caches before performing matrix ops
   /* Initialize the Matrix arrays */
   for ( i=0; i<INDEX*INDEX; i++ ){
     mresult[0][i] = 0.0;
     matrixa[0][i] = matrixb[0][i] = rand()*(float)1.1; }
 
   // TODO: L1, L2 miss rate (hits/misses), total load/store, fp instructions
+  // TODO: create an event set
   /* Setup PAPI library and begin collecting data from the counters */
   if((retval=PAPI_flops( &real_time, &proc_time, &flpins, &mflops))<PAPI_OK)
     test_fail(__FILE__, __LINE__, "PAPI_flops", retval);
 
+  // TODO: memory fence these operations, move to function
   // Change loop variant
   /* Matrix-Matrix multiply */
   for (i=0;i<INDEX;i++)
@@ -53,6 +56,10 @@ int main(int argc, char **argv) {
   printf("Real_time:\t%f\nProc_time:\t%f\nTotal flpins:\t%lld\nMFLOPS:\t\t%f\n",
   real_time, proc_time, flpins, mflops);
   printf("%s\tPASSED\n", __FILE__);
+
+  // TODO: format output table
+  // TODO: 2nd iteration: kill PAPI, use clock_gettime
+
   PAPI_shutdown();
   exit(0);
 }
