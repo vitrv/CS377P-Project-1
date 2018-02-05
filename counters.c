@@ -189,6 +189,7 @@ static void output_papi_results(int order) {
   if(file_open) {
     fprintf(file, "%s,", orderStrings[order]);
   }
+  printf("\nOrder: %s\n", orderStrings[order]);
   for(i = 0; i < EVENT_COUNT; i++) {
     printf("%s: %lld\n", eventStrings[i], values[i]);
     fprintf(file, "%lld,", values[i]);
