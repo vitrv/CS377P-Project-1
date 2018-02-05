@@ -5,7 +5,7 @@
 /*
  * CS 377P: Programming For Performance
  * Assignment 1: Performance Counters
- * Laura Catano, UT EID: XXX
+ * Laura Catano, UT EID: lnc652
  * George Ellis, UT EID: ghe88
  */
 
