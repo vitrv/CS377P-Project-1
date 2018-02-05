@@ -58,6 +58,15 @@ int main(int argc, char **argv) {
   if(init_papi() != SUCCESS)
     end(FAILURE);
 
+//
+//
+//
+//    From here down needs to go in a function.
+//                    |
+//                    |
+//                    V
+
+
   //
   // TODO: Clear caches before performing matrix ops
   //
@@ -86,10 +95,19 @@ int main(int argc, char **argv) {
 
   if(PAPI_stop(eventSet, values) != PAPI_OK) end(FAILURE);
 
-  output_papi_results(IJK);             // TODO: include this in size variation
+  output_papi_results(IJK);
 
   if(reset_papi_counters() != SUCCESS)
     end(FAILURE);
+
+  //                    ^
+  //                    |
+  //                    |
+  //    From here up needs to go in a function.
+  //
+  //
+  //
+
   if(end_papi() != SUCCESS)
     end(FAILURE);
 
