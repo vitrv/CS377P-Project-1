@@ -1,4 +1,7 @@
 {
+  "logger": {
+    "title": "Remote Sync"
+  },
   "uploadOnSave": true,
   "useAtomicWrites": false,
   "deleteLocal": false,
