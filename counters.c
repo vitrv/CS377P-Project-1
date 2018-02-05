@@ -50,12 +50,8 @@ int main(int argc, char **argv) {
 
   double matrixa[INDEX][INDEX], matrixb[INDEX][INDEX], mresult[INDEX][INDEX];
   int i, j, k;
-  for(i = 0; i < INDEX * INDEX; i++) {
-    mresult[0][i] = 0.0;
-    matrixa[0][i] = matrixb[0][i] = rand() * (double)1.1;
-  }
+  MATRIX_INIT(i, INDEX, matrixa, matrixb, mresult)
   for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
-
 
   init_file();
   eventSet = PAPI_NULL;
@@ -69,35 +65,26 @@ int main(int argc, char **argv) {
   if(PAPI_start(eventSet) != PAPI_OK) end(FAILURE);
 
   //
+  // TODO: build algorithm to change loop variant orders, size of matrices
+  //
+  int order = IJK;
+  //
   // TODO: memory fence these operations
   //
-
-  //
-  // TODO: incorporate different loop variant orders
-  //
-
-  /* Example of calling reorder function
-  v_struct variants = {&i, &j, &k};
-  reorder(order, &variants);
-  */
-
-  for (i = 0; i < INDEX; i++)
-   for(j = 0; j < INDEX; j++)
-    for(k = 0; k < INDEX; k++)
-      mresult[i][j] = mresult[i][j] + matrixa[i][k] * matrixb[k][j];
-
-      /* Example of call using reordered loop variants
-      mresult[*variants->a][*variants->b] =
-        mresult[*variants->a][*variants->b] +
-        matrixa[*variants->a][*variants->c] *
-        matrixb[*variants->c][*variants->b];
-      */
+  if(order == IJK)
+    MATRIX_MULTIPLY(i, j, k, INDEX, matrixa, matrixb, mresult)
+  else if(order == IKJ)
+    MATRIX_MULTIPLY(i, k, j, INDEX, matrixa, matrixb, mresult)
+  else if(order == JIK)
+    MATRIX_MULTIPLY(j, i, k, INDEX, matrixa, matrixb, mresult)
+  else if(order == JKI)
+    MATRIX_MULTIPLY(j, k, i, INDEX, matrixa, matrixb, mresult)
+  else if(order == KIJ)
+    MATRIX_MULTIPLY(k, i, j, INDEX, matrixa, matrixb, mresult)
+  else
+    MATRIX_MULTIPLY(k, j, i, INDEX, matrixa, matrixb, mresult)
 
   if(PAPI_stop(eventSet, values) != PAPI_OK) end(FAILURE);
-
-  //
-  // TODO: time varying sizes of matrix multiplication
-  //
 
   output_papi_results(IJK);             // TODO: include this in size variation
 
@@ -203,40 +190,6 @@ static void output_papi_results(int order) {
     fprintf(file, "%lld,", values[i]);
   }
   fprintf(file, "\n");
-}
-
-/*
- * Reorders pointers for variants of matrix multiply
- */
-static void reorder(int order, *v_struct variants) {
-  int *a = variants->i;
-  int *b = variants->j;
-  int *c = variants->k;
-
-  if(order = IJK) {
-    b = inputs->j;
-    c = inputs->k;
-  } else if(order = IKJ) {
-    b = inputs->j;
-    c = inputs->k;
-  } else if(order = JIK) {
-    a = inputs->j;
-    b = inputs->i;
-  } else if(order = JKI) {
-    a = inputs->j;
-    b = inputs->k;
-    c = inputs->i;
-  } else if(order = KIJ) {
-    a = inputs->k;
-    b = inputs->i;
-    c = inputs->j;
-  } else if(order = KJI) {
-    a = inputs->k;
-    c = inputs->i;
-  }
-  variants->i = a;
-  variants->j = b;
-  variants->k = c;
 }
 
 /*

@@ -7,12 +7,11 @@
 #include <malloc.h>
 #include "papi.h"
 
-// Definitions
-
 //
 // TODO: index should be an array of predefined matrix sizes
 //
 
+// Definitions
 #define INDEX 500
 #define FAILURE 0
 #define SUCCESS 1
@@ -24,11 +23,15 @@
 #define KJI 5
 #define EVENT_COUNT 7
 
-typedef struct v_struct {
-  int *i;
-  int *j;
-  int *k;
-} v_struct;
+// Macros
+#define MATRIX_MULTIPLY(i, j, k, index, a, b, r) for (i = 0; i < index; i++)  \
+ for(j = 0; j < index; j++)                                                   \
+  for(k = 0; k < index; k++)                                                  \
+    r[i][j] = r[i][j] + a[i][k] * b[k][j];
+#define MATRIX_INIT(i, index, a, b, r) for(i = 0; i < index * index; i++) {   \
+  r[0][i] = 0.0;                                                              \
+  a[0][i] = b[0][i] = rand() * (double)1.1;                                   \
+}
 
 // Function prototypes
 static int init_papi();
