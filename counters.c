@@ -1,7 +1,3 @@
-//
-// TODO: Laura, can you add your EID, please?
-//
-
 /*
  * CS 377P: Programming For Performance
  * Assignment 1: Performance Counters
@@ -80,10 +76,22 @@ int main(int argc, char **argv) {
   // TODO: incorporate different loop variant orders
   //
 
+  /* Example of calling reorder function
+  v_struct variants = {&i, &j, &k};
+  reorder(order, &variants);
+  */
+
   for (i = 0; i < INDEX; i++)
    for(j = 0; j < INDEX; j++)
     for(k = 0; k < INDEX; k++)
       mresult[i][j] = mresult[i][j] + matrixa[i][k] * matrixb[k][j];
+
+      /* Example of call using reordered loop variants
+      mresult[*variants->a][*variants->b] =
+        mresult[*variants->a][*variants->b] +
+        matrixa[*variants->a][*variants->c] *
+        matrixb[*variants->c][*variants->b];
+      */
 
   if(PAPI_stop(eventSet, values) != PAPI_OK) end(FAILURE);
 
@@ -195,6 +203,40 @@ static void output_papi_results(int order) {
     fprintf(file, "%lld,", values[i]);
   }
   fprintf(file, "\n");
+}
+
+/*
+ * Reorders pointers for variants of matrix multiply
+ */
+static void reorder(int order, *v_struct variants) {
+  int *a = variants->i;
+  int *b = variants->j;
+  int *c = variants->k;
+
+  if(order = IJK) {
+    b = inputs->j;
+    c = inputs->k;
+  } else if(order = IKJ) {
+    b = inputs->j;
+    c = inputs->k;
+  } else if(order = JIK) {
+    a = inputs->j;
+    b = inputs->i;
+  } else if(order = JKI) {
+    a = inputs->j;
+    b = inputs->k;
+    c = inputs->i;
+  } else if(order = KIJ) {
+    a = inputs->k;
+    b = inputs->i;
+    c = inputs->j;
+  } else if(order = KJI) {
+    a = inputs->k;
+    c = inputs->i;
+  }
+  variants->i = a;
+  variants->j = b;
+  variants->k = c;
 }
 
 /*

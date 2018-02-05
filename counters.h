@@ -24,6 +24,12 @@
 #define KJI 5
 #define EVENT_COUNT 7
 
+typedef struct v_struct {
+  int *i;
+  int *j;
+  int *k;
+} v_struct;
+
 // Function prototypes
 static int init_papi();
 static void init_file();
