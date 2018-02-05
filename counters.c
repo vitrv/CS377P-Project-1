@@ -58,6 +58,8 @@ int main(int argc, char **argv) {
     mresult[0][i] = 0.0;
     matrixa[0][i] = matrixb[0][i] = rand() * (double)1.1;
   }
+  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
+
 
   init_file();
   eventSet = PAPI_NULL;
@@ -105,7 +107,7 @@ int main(int argc, char **argv) {
 
 /*
  * Initializes PAPI library and event set, adds events listed in eventCode
- * to event set, and initializes return value array to -1.0 for error detection
+ * to event set, and initializes return value array to 0.0
  */
 static int init_papi() {
   int i;
@@ -125,7 +127,7 @@ static int init_papi() {
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
-  for(i = 0; i < EVENT_COUNT; i++) values[i] = -1.0;
+  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
   return SUCCESS;
 }
 
@@ -147,7 +149,7 @@ static int init_papi() {
 }
 
 /*
- * Resets all counters in event set and sets return value array to -1.0
+ * Resets all counters in event set and sets return value array to 0.0
  */
 static int reset_papi_counters() {
   int i, retval;
@@ -156,9 +158,7 @@ static int reset_papi_counters() {
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
-  for(i = 0; i < EVENT_COUNT; i++) values[i] = -1.0;
-  // XXX: This prints zeroes. Curious...
-  for(i = 0; i < EVENT_COUNT; i++) printf("%f\n", values[i]);
+  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
   return SUCCESS;
 }
 
@@ -190,8 +190,8 @@ static void output_papi_results(int order) {
     fprintf(file, "%s,", orderStrings[order]);
   }
   for(i = 0; i < EVENT_COUNT; i++) {
-    printf("%s: %f\n", eventStrings[i], values[i]);
-    fprintf(file, "%f,", values[i]);
+    printf("%s: %lld\n", eventStrings[i], values[i]);
+    fprintf(file, "%lld,", values[i]);
   }
   fprintf(file, "\n");
 }
