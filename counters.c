@@ -9,39 +9,26 @@
  * George Ellis, UT EID: ghe88
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <memory.h>
-#include <malloc.h>
-#include "papi.h"
-
-//
-// TODO: index should be an array of predefined matrix sizes
-//
-
-// Definitions
-#define INDEX 100
-#define FAILURE -1
-#define SUCCESS 0
+#include "counters.h"
 
 // Globals
 int eventSet = PAPI_NULL;                     // Event set for PAPI
-int eventCount = 7;                           // Number of events to time
-long long values[eventCount];                 // Return values for timed events
-int eventCode[eventCount] = {                 // PAPI defined CONSTANTS
-  PAPI_TOT_CYC_idx,
-  PAPI_TOT_INS_idx,
-  PAPI_LST_INS_idx,
-  PAPI_L1_DCA_idx,
-  PAPI_L1_DCM_idx,
-  PAPI_L2_DCA_idx,
-  PAPI_L2_DCM_idx
+long long values[EVENT_COUNT];                // Return values for timed events
+FILE *file;                                   // Output file
+const char *file_path = "./output.csv";       // Output file path
+const char *file_flags = "w+";                // Writeable, rewrite previous
+int file_open;                                // File opened status
+int eventCode[EVENT_COUNT] = {                // PAPI defined CONSTANTS
+  PAPI_TOT_CYC,
+  PAPI_TOT_INS,
+  PAPI_LST_INS,
+  PAPI_L1_DCA,
+  PAPI_L1_DCM,
+  PAPI_L2_DCA,
+  PAPI_L2_DCM
 };
-const char *eventStrings[eventCount] = {      // Descriptions of timed events
-  "Total cyles",
+const char *eventStrings[EVENT_COUNT] = {      // Descriptions of timed events
+  "Total cycles",
   "Total instructions",
   "Total load/store instructions",
   "L1 data cache accesses",
@@ -49,15 +36,14 @@ const char *eventStrings[eventCount] = {      // Descriptions of timed events
   "L2 data cache accesses",
   "L2 data cache misses"
 };
-
-// Function headers
-static int init_papi();
-static void init_arrays(double *a, double *b, double *r, int index);
-static int time_multiply(double *a, double *b, double *r, int index);
-static void output_results();
-static int reset_papi();
-static int end_papi();
-static void end(int status) __attribute__((noreturn));
+const char *orderStrings[6] = {               // Descriptions of loops orders
+  "I-J-K",
+  "I-K-J",
+  "J-I-K",
+  "J-K-I",
+  "K-I-J",
+  "K-J-I"
+};
 
 int main(int argc, char **argv) {
   extern void dummy(void *);
@@ -67,24 +53,44 @@ int main(int argc, char **argv) {
   //
 
   double matrixa[INDEX][INDEX], matrixb[INDEX][INDEX], mresult[INDEX][INDEX];
+  int i, j, k;
+  for(i = 0; i < INDEX * INDEX; i++) {
+    mresult[0][i] = 0.0;
+    matrixa[0][i] = matrixb[0][i] = rand() * (double)1.1;
+  }
 
+  init_file();
   eventSet = PAPI_NULL;
   if(init_papi() != SUCCESS)
     end(FAILURE);
 
   //
   // TODO: Clear caches before performing matrix ops
-  // XXX: Programatically read cache sizes, or just define arbitrarily large
-  // XXX: array?
   //
+
+  if(PAPI_start(eventSet) != PAPI_OK) end(FAILURE);
+
+  //
+  // TODO: memory fence these operations
+  //
+
+  //
+  // TODO: incorporate different loop variant orders
+  //
+
+  for (i = 0; i < INDEX; i++)
+   for(j = 0; j < INDEX; j++)
+    for(k = 0; k < INDEX; k++)
+      mresult[i][j] = mresult[i][j] + matrixa[i][k] * matrixb[k][j];
+
+  if(PAPI_stop(eventSet, values) != PAPI_OK) end(FAILURE);
 
   //
   // TODO: time varying sizes of matrix multiplication
   //
 
-  if(time_multiply(&matrixa, &matrixb, &mresult, INDEX) != SUCCESS)
-    end(FAILURE);
-  output_results();
+  output_papi_results(IJK);             // TODO: include this in size variation
+
   if(reset_papi_counters() != SUCCESS)
     end(FAILURE);
   if(end_papi() != SUCCESS)
@@ -102,43 +108,57 @@ int main(int argc, char **argv) {
  * to event set, and initializes return value array to -1.0 for error detection
  */
 static int init_papi() {
+  int i;
   int retval = PAPI_library_init(PAPI_VER_CURRENT);
   if(retval != PAPI_VER_CURRENT) {
     printf("Error initializing PAPI\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
-  if(PAPI_create_eventset(&eventSet) != PAPI_OK) {
+  if((retval = PAPI_create_eventset(&eventSet)) < PAPI_OK) {
     printf("Error initializing EventSet to PAPI\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
-  if(PAPI_add_events(eventSet, &eventCode, eventCount) != PAPI_OK) {
+  if((retval = PAPI_add_events(eventSet, eventCode, EVENT_COUNT)) < PAPI_OK) {
     printf("Error adding events to PAPI\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
-  for(i = 0; i < eventCount; i++) values[i] = -1.0;
+  for(i = 0; i < EVENT_COUNT; i++) values[i] = -1.0;
   return SUCCESS;
 }
 
 /*
- * Populates matrices with random doubles, initializes result matrix to zeroes
+ * Initializes file output
  */
-static void init_arrays(double *a, double *b, double *r, int index) {
-  int i;
-  for(i = 0; i < index * index; i++) {
-    *r[0][i] = 0.0;
-    *a[0][i] = *b[0][i] = rand() * (double)1.1;
-  }
+ static void init_file() {
+   int i;
+   file = fopen(file_path, file_flags);
+   if(file == NULL) {
+     printf("Error creating/opening file. Output to console only.\n");
+     file_open = FAILURE;
+   } else file_open = SUCCESS;
+   fprintf(file, "Order,");
+   for(i = 0; i < EVENT_COUNT; i++) {
+     fprintf(file, "%s,", eventStrings[i]);
+   }
+   fprintf(file, "\n");
 }
 
 /*
  * Resets all counters in event set and sets return value array to -1.0
  */
 static int reset_papi_counters() {
-  if(PAPI_reset(eventSet) != PAPI_OK) {
+  int i, retval;
+  if((retval = PAPI_reset(eventSet)) < PAPI_OK) {
     printf("Error resetting event counters\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
-  for(i = 0; i < eventCount; i++) values[i] = -1.0;
+  for(i = 0; i < EVENT_COUNT; i++) values[i] = -1.0;
+  // XXX: This prints zeroes. Curious...
+  for(i = 0; i < EVENT_COUNT; i++) printf("%f\n", values[i]);
   return SUCCESS;
 }
 
@@ -146,12 +166,15 @@ static int reset_papi_counters() {
  * Cleans up event set and once empty, destroys it
  */
 static int end_papi() {
-  if(PAPI_cleanup_eventset(eventSet) != PAPI_OK) {
+  int retval;
+  if((retval = PAPI_cleanup_eventset(eventSet)) < PAPI_OK) {
     printf("Error clearing event setn\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
-  if(PAPI_destroy_eventset(eventSet) != PAPI_OK) {
+  if((retval = PAPI_destroy_eventset(&eventSet)) < PAPI_OK) {
     printf("Error destroying event set\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     return FAILURE;
   }
   eventSet = PAPI_NULL;
@@ -161,55 +184,29 @@ static int end_papi() {
 /*
  * Output events to screen and write to .csv file for aggregation
  */
-static void output_results() {
+static void output_papi_results(int order) {
   int i;
-  for(i = 0; i < eventCount; i++)
+  if(file_open) {
+    fprintf(file, "%s,", orderStrings[order]);
+  }
+  for(i = 0; i < EVENT_COUNT; i++) {
     printf("%s: %f\n", eventStrings[i], values[i]);
-
-  //
-  // TODO: write to .csv file
-  //
-
-}
-
-/*
- * Start PAPI, perform matrix multiply, stop PAPI
- */
-static int time_multiply(float *a, float *b, float *r, int index) {
-  int i, j, k;
-  if(PAPI_start(eventSet) != PAPI_OK) {
-    printf("Error starting event counters\n");
-    return FAILURE;
+    fprintf(file, "%f,", values[i]);
   }
-
-  //
-  // TODO: memory fence these operations
-  //
-
-  //
-  // TODO: incorporate different loop variant orders
-  //
-
-  for (i = 0; i < index; i++)
-   for(j = 0; j < index; j++)
-    for(k = 0; k < index; k++)
-      *r[i][j] = *r[i][j] + *a[i][k] * *b[k][j];
-
-  if(PAPI_stop(eventSet, &values) != PAPI_OK) {
-    printf("Error stopping event counters\n");
-    return FAILURE;
-  }
-  return SUCCESS;
+  fprintf(file, "\n");
 }
 
 /*
  * End the program
  */
- static void end(int status) __attribute__((noreturn)) {
+ static void end(int status) {
 
    //
    // TODO: free any memory that might still by malloc'ed
    //
+
+   if(file_open) fclose(file);
+   file = NULL;
 
    if(status == FAILURE) {
      printf("\n\t*** Irrecoverable failure. Exiting. ***\n\n");
