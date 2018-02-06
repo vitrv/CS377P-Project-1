@@ -188,10 +188,10 @@ static void end_timers() {
  * Outputs time data to console and file
  */
 static void output_time_results() {
-  double thread_elapsed = (thread_time_end.tv_nsec - thread_time_begin.tv_nsec)
-    / (double) 1000000000;
-  double real_elapsed = (real_time_end.tv_nsec - real_time_begin.tv_nsec)
-    / (double) 1000000000;
+  double thread_elapsed = ((unsigned)(thread_time_end.tv_nsec -
+    thread_time_begin.tv_nsec)) / (double) 1000000000;
+  double real_elapsed = ((unsigned)(real_time_end.tv_nsec -
+    real_time_begin.tv_nsec)) / (double) 1000000000;
   if(file_open) {
     fprintf(file, "%f,%f\n", thread_elapsed, real_elapsed);
   }
