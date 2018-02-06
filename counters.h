@@ -17,7 +17,7 @@
 #define KIJ 4
 #define KJI 5
 #define ORDER_COUNT 6
-#define EVENT_COUNT 7
+#define EVENT_COUNT 8
 #define INDEX_COUNT 8
 
 // Macros
