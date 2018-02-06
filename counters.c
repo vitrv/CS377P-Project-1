@@ -63,8 +63,8 @@ int main(int argc, char **argv) {
       matrices = init_matrices(indexes[index]);
       clear_cache(buffer, cache_size);
 
-      // TODO: memory fence these 3 operations
       PAPI_start(eventSet);
+      // TODO: memory fence this function
       multiply_matrices(matrices, order, indexes[index]);
       PAPI_stop(eventSet, values);
 
