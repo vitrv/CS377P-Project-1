@@ -14,6 +14,10 @@ FILE *file;                                   // Output file
 const char *file_path = "./output.csv";       // Output file path
 const char *file_flags = "w+";                // Writeable, rewrite previous
 int file_open;                                // File opened status
+struct timespec thread_time_begin;            // Timers
+struct timespec real_time_begin;
+struct timespec thread_time_end;
+struct timespec real_time_end;
 int eventCode1[EVENT_COUNT] = {               // PAPI defined CONSTANTS
   PAPI_TOT_CYC,
   PAPI_TOT_INS,
@@ -57,22 +61,27 @@ int main(int argc, char **argv) {
   void* buffer = NULL;
 
   init_file();
+  init_timers();
   eventSet = PAPI_NULL;
   init_papi();
   cache_size = init_cache_buffer(&buffer);
 
   for(index = 0; index < INDEX_COUNT; index++) {
     for(order = 0; order < ORDER_COUNT; order++) {
+      // Initialize matrices
       matrices = init_matrices(indexes[index]);
+
+      // PAPI iterations
       for(iteration = 0; iteration < 2; iteration++) {
         clear_cache(buffer, cache_size);
         papi_MxM(matrices, index, order, iteration);
       }
-      // TODO: create output functions for getclocktime()
-      // TODO: modify header line of init file to include new column names
-      // TODO: modify output_papi_results to not end with \n char
-      // TODO: clear cache, time with clock_thread_cputtime_id, output
-      // TODO: clear cache, time with clock_realtime, output (must end with \n)
+
+      // clock_gettime() iteration
+      clear_cache(buffer, cache_size);
+      clock_MxM(matrices, index, order);
+
+      // Free matrices
       free_matrices(matrices, indexes[index]);
     }
   }
@@ -93,6 +102,16 @@ static void papi_MxM(m_struct matrices, int index, int order, int iteration) {
 }
 
 /*
+ * Multiplies matrices and times operations clock_gettime()
+ */
+static void clock_MxM(m_struct matrices, int index, int order) {
+  start_timers();
+  multiply_matrices(matrices, order, indexes[index]);
+  end_timers();
+  output_time_results();
+}
+
+/*
  * Initializes file output
  */
 static void init_file() {
@@ -106,7 +125,10 @@ static void init_file() {
   for(i = 0; i < EVENT_COUNT; i++) {
     fprintf(file, "%s,", eventStrings1[i]);
   }
-  fprintf(file, "\n");
+  for(i = 0; i < EVENT_COUNT; i++) {
+    fprintf(file, "%s,", eventStrings2[i]);
+  }
+  fprintf(file, "Thread time (sec),Real time (sec)\n");
 }
 
 /*
@@ -134,6 +156,47 @@ static int init_cache_buffer(void** buffer) {
  */
 static void clear_cache(void* buffer, int cache_size) {
   memset(buffer, 99, (size_t)cache_size);
+}
+
+/*
+ * Initializes timer structs
+ */
+static void init_timers() {
+  thread_time_begin.tv_sec = thread_time_end.tv_sec = 0;
+  thread_time_begin.tv_nsec = thread_time_end.tv_nsec = 0;
+  real_time_begin.tv_sec = real_time_end.tv_sec = 0;
+  real_time_begin.tv_nsec = real_time_end.tv_nsec = 0;
+}
+
+/*
+ * Starts timers
+ */
+static void start_timers() {
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &thread_time_begin);
+  clock_gettime(CLOCK_REALTIME, &real_time_begin);
+}
+
+/*
+ * Ends timers
+ */
+static void end_timers() {
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &thread_time_end);
+  clock_gettime(CLOCK_REALTIME, &real_time_end);
+}
+
+/*
+ * Outputs time data to console and file
+ */
+static void output_time_results() {
+  double thread_elapsed = (thread_time_end.tv_nsec - thread_time_begin.tv_nsec)
+    / (double) 1000000000;
+  double real_elapsed = (real_time_end.tv_nsec - real_time_begin.tv_nsec)
+    / (double) 1000000000;
+  if(file_open) {
+    fprintf(file, "%f,%f\n", thread_elapsed, real_elapsed);
+  }
+  printf("Thread time: %f seconds\n", thread_elapsed);
+  printf("Real time: %f seconds\n", real_elapsed);
 }
 
 /*
@@ -206,7 +269,6 @@ static void output_papi_results(int index, int order, int iteration) {
       iteration == 0 ? eventStrings1[i] : eventStrings2[i], values[i]);
     fprintf(file, "%lld,", values[i]);
   }
-  if(iteration == 1) fprintf(file, "\n");
 }
 
 /*

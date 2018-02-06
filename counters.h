@@ -6,6 +6,7 @@
 #include <memory.h>
 #include <malloc.h>
 #include <cpuid.h>
+#include <time.h>
 #include "papi.h"
 #include "emmintrin.h"
 
@@ -36,15 +37,24 @@ typedef struct m_struct {
 
 // Function prototypes
 static void papi_MxM(m_struct matrices, int index, int order, int iteration);
+static void clock_MxM(m_struct matrices, int index, int order);
+
 static void init_file();
 static int init_cache_buffer(void** buffer);
 static void clear_cache(void* buffer, int cache_size);
+
+static void init_timers();
+static void start_timers();
+static void end_timers();
+static void output_time_results();
+
 static void init_papi();
 static inline void clear_papi_values();
 static void start_papi(int iteration);
 static void stop_papi(int iteration);
 static void output_papi_results(int index, int order, int iteration);
 static void end_papi();
+
 static m_struct init_matrices(int index);
 static double** alloc_array(int index);
 static void load_matrices(m_struct matrices, int index);
