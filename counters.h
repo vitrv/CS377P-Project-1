@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <memory.h>
 #include <malloc.h>
+#include <cpuid.h>
 #include "papi.h"
 #include "emmintrin.h"
 
@@ -34,6 +35,7 @@ typedef struct m_struct {
 } m_struct;
 
 // Function prototypes
+static void papi_MxM(m_struct matrices, int index, int order, int iteration);
 static void init_file();
 static int init_cache_buffer(void** buffer);
 static void clear_cache(void* buffer, int cache_size);

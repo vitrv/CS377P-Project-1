@@ -64,27 +64,32 @@ int main(int argc, char **argv) {
   for(index = 0; index < INDEX_COUNT; index++) {
     for(order = 0; order < ORDER_COUNT; order++) {
       matrices = init_matrices(indexes[index]);
-
       for(iteration = 0; iteration < 2; iteration++) {
         clear_cache(buffer, cache_size);
-        clear_papi_values();
-        start_papi(iteration);
-
-        // More fences may be needed !!
-        multiply_matrices(matrices, order, indexes[index]);
-        _mm_mfence();
-
-        stop_papi(iteration);
-        output_papi_results(indexes[index], order, iteration);
+        papi_MxM(matrices, index, order, iteration);
       }
-
+      // TODO: create output functions for getclocktime()
+      // TODO: modify header line of init file to include new column names
+      // TODO: modify output_papi_results to not end with \n char
+      // TODO: clear cache, time with clock_thread_cputtime_id, output
+      // TODO: clear cache, time with clock_realtime, output (must end with \n)
       free_matrices(matrices, indexes[index]);
     }
   }
 
   end_papi();
-  // TODO: Repeat tests using clock_gettime
   end(SUCCESS);
+}
+
+/*
+ * Multiplies matrices and times operations using PAPI
+ */
+static void papi_MxM(m_struct matrices, int index, int order, int iteration) {
+  clear_papi_values();
+  start_papi(iteration);
+  multiply_matrices(matrices, order, indexes[index]);
+  stop_papi(iteration);
+  output_papi_results(indexes[index], order, iteration);
 }
 
 /*
@@ -194,7 +199,7 @@ static void output_papi_results(int index, int order, int iteration) {
     if(file_open) {
       fprintf(file, "%d,%s,", index, orderStrings[order]);
     }
-    printf("\nSize: %d Order: %s\n", index, orderStrings[order]);
+    printf("\n\t\t=== Size: %d Order: %s===\n", index, orderStrings[order]);
   }
   for(i = 0; i < EVENT_COUNT; i++) {
     printf("%s: %lld\n",
@@ -285,11 +290,17 @@ static void free_matrices(m_struct matrices, int index) {
  * Multiplies two matrices in specified order
  */
 static void multiply_matrices(m_struct matrices, int order, int index) {
+  // TODO: memory fence these operations
   int i, j, k;
-  // // TODO: define matrixa, matrixb, mresult
   double** matrixa = matrices.matrixa;
   double** matrixb = matrices.matrixb;
   double** mresult = matrices.mresult;
+
+  unsigned level, eax, ebx, ecx, edx;
+  eax = level = 0;
+  _mm_mfence();
+  __get_cpuid(level, &eax, &ebx, &ecx, &edx);
+
   if(order == IJK)
     MATRIX_MULTIPLY(i, j, k, index, matrixa, matrixb, mresult)
   else if(order == IKJ)
