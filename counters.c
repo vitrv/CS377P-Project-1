@@ -24,88 +24,6 @@ int eventCode[EVENT_COUNT] = {                // PAPI defined CONSTANTS
   PAPI_L2_DCA,
   PAPI_L2_DCM
 };
-// The best TODO ever:
-//  _____  _                        _
-// |  _  || |                      | |
-// | | | || |__       _ __    ___  | |
-// | | | || '_ \     | '_ \  / _ \ | |
-// \ \_/ /| | | | _  | | | || (_) ||_|
-//  \___/ |_| |_|( ) |_| |_| \___/ (_)
-//               |/
-//
-//  _____
-// |_   _|
-//   | |    ___    ___    _ __ ___    __ _  _ __   _   _
-//   | |   / _ \  / _ \  | '_ ` _ \  / _` || '_ \ | | | |
-//   | |  | (_) || (_) | | | | | | || (_| || | | || |_| |
-//   \_/   \___/  \___/  |_| |_| |_| \__,_||_| |_| \__, |
-//                                                  __/ |
-//                                                 |___/
-//                             _
-//                            | |
-//   ___   ___   _   _  _ __  | |_   ___  _ __  ___
-//  / __| / _ \ | | | || '_ \ | __| / _ \| '__|/ __|
-// | (__ | (_) || |_| || | | || |_ |  __/| |   \__ \
-//  \___| \___/  \__,_||_| |_| \__| \___||_|   |___/
-//
-//
-//       __
-//  _   / /
-// (_) | |
-//     | |
-//  _  | |
-// (_) | |
-//      \_\
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//  _    _                       _
-// | |  | |                     | |
-// | |  | |  ___    ___   _ __  | | _   _
-// | |/\| | / _ \  / _ \ | '_ \ | || | | |
-// \  /\  /|  __/ | (_) || | | || || |_| |
-//  \/  \/  \___|  \___/ |_| |_||_| \__, |
-//                                   __/ |
-//                                  |___/
-//               _     ______                       _
-//              | |   |___  /                      | |
-//   __ _   ___ | |_     / /       __ _  _ __    __| |
-//  / _` | / _ \| __|   / /       / _` || '_ \  / _` |
-// | (_| ||  __/| |_  ./ /    _  | (_| || | | || (_| |
-//  \__, | \___| \__| \_/    ( )  \__,_||_| |_| \__,_|
-//   __/ |                   |/
-//  |___/
-//                    _  _    _
-//                   | || |  (_)
-//  _ __ ___   _   _ | || |_  _  ______
-// | '_ ` _ \ | | | || || __|| ||______|
-// | | | | | || |_| || || |_ | |
-// |_| |_| |_| \__,_||_| \__||_|
-//
-//
-//         _              _                 _
-//        | |            (_)               (_)
-//  _ __  | |  ___ __  __ _  _ __    __ _   _  ___
-// | '_ \ | | / _ \\ \/ /| || '_ \  / _` | | |/ __|
-// | |_) || ||  __/ >  < | || | | || (_| | | |\__ \
-// | .__/ |_| \___|/_/\_\|_||_| |_| \__, | |_||___/
-// | |                               __/ |
-// |_|                              |___/
-//  _                                                 __
-// | |                                               / _|
-// | |__   _   _   __ _   __ _  _   _   ___   ___   | |_   __ _  _ __
-// | '_ \ | | | | / _` | / _` || | | | / __| / _ \  |  _| / _` || '__|
-// | |_) || |_| || (_| || (_| || |_| | \__ \| (_) | | |  | (_| || |    _
-// |_.__/  \__,_| \__, | \__, | \__, | |___/ \___/  |_|   \__,_||_|   (_)
-//                 __/ |  __/ |  __/ |
-//                |___/  |___/  |___/
-
 const char *eventStrings[EVENT_COUNT] = {      // Descriptions of timed events
   "Total cycles",
   "Total instructions",
@@ -217,24 +135,28 @@ static void init_papi() {
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     end(FAILURE);
   }
-  // TODO: fix this
-  // PAPI_assign_eventset_component(eventSet, 0);
-  // if((retval = PAPI_multiplex_init()) != PAPI_OK) {
-  //   printf("Error initializing multiplexing\n");
-  //   printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-  //   end(FAILURE);
-  // }
+  PAPI_assign_eventset_component(eventSet, 0);
+  if((retval = PAPI_multiplex_init()) != PAPI_OK) {
+    printf("Error initializing multiplexing\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
   if((retval = PAPI_create_eventset(&eventSet)) < PAPI_OK) {
     printf("Error initializing EventSet to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     end(FAILURE);
   }
   // TODO: fix this
-  // if((retval = PAPI_set_multiplex(eventSet)) != PAPI_OK) {
-  //   printf("Error multiplexing EventSet\n");
-  //   printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-  //   end(FAILURE);
-  // }
+  if((retval = PAPI_assign_eventset_component(eventSet, 0)) != PAPI_OK) {
+    printf("Error assing EventSet component\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
+  if((retval = PAPI_set_multiplex(eventSet)) != PAPI_OK) {
+    printf("Error multiplexing EventSet\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
   if((retval = PAPI_add_events(eventSet, eventCode, EVENT_COUNT)) < PAPI_OK) {
     printf("Error adding events to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
