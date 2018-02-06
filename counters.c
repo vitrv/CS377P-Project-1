@@ -107,7 +107,7 @@ static int init_cache_buffer(void** buffer) {
     end(FAILURE);
   }
   int cache_size = (*hw_info).mem_hierarchy.level[0].cache[0].size +
-    (*hw_info).mem_hierarchy.level[0].cache[0].size;
+    (*hw_info).mem_hierarchy.level[1].cache[0].size;
   *buffer = malloc(cache_size);
   if(buffer == NULL) {
     printf("\tError: couldn't allocate cache buffer.\n");
