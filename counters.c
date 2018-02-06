@@ -14,21 +14,25 @@ FILE *file;                                   // Output file
 const char *file_path = "./output.csv";       // Output file path
 const char *file_flags = "w+";                // Writeable, rewrite previous
 int file_open;                                // File opened status
-int eventCode[EVENT_COUNT] = {                // PAPI defined CONSTANTS
+int eventCode1[EVENT_COUNT] = {               // PAPI defined CONSTANTS
   PAPI_TOT_CYC,
   PAPI_TOT_INS,
   PAPI_LST_INS,
-  PAPI_FP_INS,
+  PAPI_FP_INS
+};
+int eventCode2[EVENT_COUNT] = {               // PAPI defined CONSTANTS
   PAPI_L1_DCA,
   PAPI_L1_DCM,
   PAPI_L2_DCA,
   PAPI_L2_DCM
 };
-const char *eventStrings[EVENT_COUNT] = {      // Descriptions of timed events
+const char *eventStrings1[EVENT_COUNT] = {    // Descriptions of timed events
   "Total cycles",
   "Total instructions",
   "Total load/store instructions",
-  "Total floating point instructions",
+  "Total floating point instructions"
+};
+const char *eventStrings2[EVENT_COUNT] = {    // Descriptions of timed events
   "L1 data cache accesses",
   "L1 data cache misses",
   "L2 data cache accesses",
@@ -48,7 +52,7 @@ int indexes[INDEX_COUNT] = {                  // Matrix sizes to multiply
 
 int main(int argc, char **argv) {
   extern void dummy(void *);
-  int index, order, cache_size;
+  int iteration, index, order, cache_size;
   m_struct matrices;
   void* buffer = NULL;
 
@@ -56,21 +60,22 @@ int main(int argc, char **argv) {
   eventSet = PAPI_NULL;
   init_papi();
   cache_size = init_cache_buffer(&buffer);
-  clear_papi_values();
 
   for(index = 0; index < INDEX_COUNT; index++) {
     for(order = 0; order < ORDER_COUNT; order++) {
       matrices = init_matrices(indexes[index]);
-      clear_cache(buffer, cache_size);
 
-      PAPI_start(eventSet);
-      // TODO: memory fence this function
-      multiply_matrices(matrices, order, indexes[index]);
-      PAPI_stop(eventSet, values);
+      for(iteration = 0; iteration < 2; iteration++) {
+        clear_cache(buffer, cache_size);
+        clear_papi_values();
+        start_papi(iteration);
+        // TODO: memory fence this function
+        multiply_matrices(matrices, order, indexes[index]);
+        stop_papi(iteration);
+        output_papi_results(indexes[index], order, iteration);
+      }
 
       free_matrices(matrices, indexes[index]);
-      output_papi_results(indexes[index], order);
-      reset_papi_counters();
     }
   }
 
@@ -82,18 +87,18 @@ int main(int argc, char **argv) {
 /*
  * Initializes file output
  */
- static void init_file() {
-   int i;
-   file = fopen(file_path, file_flags);
-   if(file == NULL) {
-     printf("Error creating/opening file. Output to console only.\n");
-     file_open = FAILURE;
-   } else file_open = SUCCESS;
-   fprintf(file, "Size,Order,");
-   for(i = 0; i < EVENT_COUNT; i++) {
-     fprintf(file, "%s,", eventStrings[i]);
-   }
-   fprintf(file, "\n");
+static void init_file() {
+  int i;
+  file = fopen(file_path, file_flags);
+  if(file == NULL) {
+    printf("Error creating/opening file. Output to console only.\n");
+    file_open = FAILURE;
+  } else file_open = SUCCESS;
+  fprintf(file, "Size,Order,");
+  for(i = 0; i < EVENT_COUNT; i++) {
+    fprintf(file, "%s,", eventStrings1[i]);
+  }
+  fprintf(file, "\n");
 }
 
 /*
@@ -124,7 +129,7 @@ static void clear_cache(void* buffer, int cache_size) {
 }
 
 /*
- * Initializes PAPI library and event set, adds events listed in eventCode
+ * Initializes PAPI library and event set, adds events listed in eventCode1
  * to event set, and initializes return value array to 0.0
  */
 static void init_papi() {
@@ -135,34 +140,11 @@ static void init_papi() {
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     end(FAILURE);
   }
-  PAPI_assign_eventset_component(eventSet, 0);
-  if((retval = PAPI_multiplex_init()) != PAPI_OK) {
-    printf("Error initializing multiplexing\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    end(FAILURE);
-  }
   if((retval = PAPI_create_eventset(&eventSet)) < PAPI_OK) {
     printf("Error initializing EventSet to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     end(FAILURE);
   }
-  // TODO: fix this
-  if((retval = PAPI_assign_eventset_component(eventSet, 0)) != PAPI_OK) {
-    printf("Error assing EventSet component\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    end(FAILURE);
-  }
-  if((retval = PAPI_set_multiplex(eventSet)) != PAPI_OK) {
-    printf("Error multiplexing EventSet\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    end(FAILURE);
-  }
-  if((retval = PAPI_add_events(eventSet, eventCode, EVENT_COUNT)) < PAPI_OK) {
-    printf("Error adding events to PAPI\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    end(FAILURE);
-  }
-  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
 }
 
 /*
@@ -170,36 +152,53 @@ static void init_papi() {
  */
 static inline void clear_papi_values() {
   int i;
-  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
+  for(i = 0 ; i < EVENT_COUNT; i++) values[i] = 0.0;
+}
+
+/*
+ * Adds specified event codes to event set and starts PAPI counters
+ */
+static void start_papi(int iteration) {
+  int retval;
+  if((retval = PAPI_add_events(eventSet,
+    iteration == 0 ? eventCode1 : eventCode2, EVENT_COUNT)) < PAPI_OK) {
+    printf("Error adding events to PAPI\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
+  PAPI_start(eventSet);
+}
+
+/*
+ * Stops PAPI counters and removes last event codes from event set
+ */
+static void stop_papi(int iteration) {
+  int retval;
+  PAPI_stop(eventSet, values);
+  if((retval = PAPI_cleanup_eventset(eventSet) != PAPI_OK)) {
+    printf("Error cleaning up event set\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
 }
 
 /*
  * Output events to screen and write to .csv file for aggregation
  */
-static void output_papi_results(int index, int order) {
+static void output_papi_results(int index, int order, int iteration) {
   int i;
-  if(file_open) {
-    fprintf(file, "%d,%s,", index, orderStrings[order]);
+  if(iteration == 0) {
+    if(file_open) {
+      fprintf(file, "%d,%s,", index, orderStrings[order]);
+    }
+    printf("\nSize: %d Order: %s\n", index, orderStrings[order]);
   }
-  printf("\nSize: %d Order: %s\n", index, orderStrings[order]);
   for(i = 0; i < EVENT_COUNT; i++) {
-    printf("%s: %lld\n", eventStrings[i], values[i]);
+    printf("%s: %lld\n",
+      iteration == 0 ? eventStrings1[i] : eventStrings2[i], values[i]);
     fprintf(file, "%lld,", values[i]);
   }
-  fprintf(file, "\n");
-}
-
-/*
- * Resets all counters in event set and sets return value array to 0.0
- */
-static void reset_papi_counters() {
-  int i, retval;
-  if((retval = PAPI_reset(eventSet)) < PAPI_OK) {
-    printf("Error resetting event counters\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    end(FAILURE);
-  }
-  clear_papi_values();
+  if(iteration == 1) fprintf(file, "\n");
 }
 
 /*
@@ -305,16 +304,16 @@ static void multiply_matrices(m_struct matrices, int order, int index) {
 /*
  * End the program
  */
- static void end(int status) {
-   if(file_open) fclose(file);
-   file = NULL;
+static void end(int status) {
+  if(file_open) fclose(file);
+  file = NULL;
 
-   if(status == FAILURE) {
-     printf("\n\t*** Irrecoverable failure. Exiting. ***\n\n");
-     exit(-1);
-   }
+  if(status == FAILURE) {
+    printf("\n\t*** Irrecoverable failure. Exiting. ***\n\n");
+    exit(-1);
+  }
 
-   printf("\n\t*** Success. Exiting. ***\n\n");
-   exit(0);
-   __builtin_unreachable();
- }
+  printf("\n\t*** Success. Exiting. ***\n\n");
+  exit(0);
+  __builtin_unreachable();
+}
