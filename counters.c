@@ -40,108 +40,41 @@ const char *orderStrings[6] = {               // Descriptions of loops orders
   "K-I-J",
   "K-J-I"
 };
+int indexes[INDEX_COUNT] = {                  // Matrix sizes to multiply
+  50, 100, 200, 400, 800, 1200, 1600, 2000
+};
 
 int main(int argc, char **argv) {
   extern void dummy(void *);
-
-  //
-  // TODO: we should dynamically malloc and free these arrays
-  //
-
-  double matrixa[INDEX][INDEX], matrixb[INDEX][INDEX], mresult[INDEX][INDEX];
-  int i, j, k;
-  MATRIX_INIT(i, INDEX, matrixa, matrixb, mresult)
-  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
+  int index, order, cache_size;
+  m_struct matrices;
+  void* buffer = NULL;
 
   init_file();
   eventSet = PAPI_NULL;
-  if(init_papi() != SUCCESS)
-    end(FAILURE);
+  init_papi();
+  cache_size = init_cache_buffer(&buffer);
+  clear_papi_values();
 
-//
-//
-//
-//    From here down needs to go in a function.
-//                    |
-//                    |
-//                    V
+  for(index = 0; index < INDEX_COUNT; index++) {
+    for(order = 0; order < ORDER_COUNT; order++) {
+      matrices = init_matrices(indexes[index]);
+      clear_cache(buffer, cache_size);
 
+      // TODO: memory fence these 3 operations
+      PAPI_start(eventSet);
+      multiply_matrices(matrices, order, indexes[index]);
+      PAPI_stop(eventSet, values);
 
-  //
-  // TODO: Clear caches before performing matrix ops
-  //
+      free_matrices(matrices, indexes[index]);
+      output_papi_results(indexes[index], order);
+      reset_papi_counters();
+    }
+  }
 
-  if(PAPI_start(eventSet) != PAPI_OK) end(FAILURE);
-
-  //
-  // TODO: build algorithm to change loop variant orders, size of matrices
-  //
-  int order = IJK;
-  //
-  // TODO: memory fence these operations
-  //
-  if(order == IJK)
-    MATRIX_MULTIPLY(i, j, k, INDEX, matrixa, matrixb, mresult)
-  else if(order == IKJ)
-    MATRIX_MULTIPLY(i, k, j, INDEX, matrixa, matrixb, mresult)
-  else if(order == JIK)
-    MATRIX_MULTIPLY(j, i, k, INDEX, matrixa, matrixb, mresult)
-  else if(order == JKI)
-    MATRIX_MULTIPLY(j, k, i, INDEX, matrixa, matrixb, mresult)
-  else if(order == KIJ)
-    MATRIX_MULTIPLY(k, i, j, INDEX, matrixa, matrixb, mresult)
-  else
-    MATRIX_MULTIPLY(k, j, i, INDEX, matrixa, matrixb, mresult)
-
-  if(PAPI_stop(eventSet, values) != PAPI_OK) end(FAILURE);
-
-  output_papi_results(IJK);
-
-  if(reset_papi_counters() != SUCCESS)
-    end(FAILURE);
-
-  //                    ^
-  //                    |
-  //                    |
-  //    From here up needs to go in a function.
-  //
-  //
-  //
-
-  if(end_papi() != SUCCESS)
-    end(FAILURE);
-
-  //
+  end_papi();
   // TODO: Repeat tests using clock_gettime
-  //
-
   end(SUCCESS);
-}
-
-/*
- * Initializes PAPI library and event set, adds events listed in eventCode
- * to event set, and initializes return value array to 0.0
- */
-static int init_papi() {
-  int i;
-  int retval = PAPI_library_init(PAPI_VER_CURRENT);
-  if(retval != PAPI_VER_CURRENT) {
-    printf("Error initializing PAPI\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    return FAILURE;
-  }
-  if((retval = PAPI_create_eventset(&eventSet)) < PAPI_OK) {
-    printf("Error initializing EventSet to PAPI\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    return FAILURE;
-  }
-  if((retval = PAPI_add_events(eventSet, eventCode, EVENT_COUNT)) < PAPI_OK) {
-    printf("Error adding events to PAPI\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    return FAILURE;
-  }
-  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
-  return SUCCESS;
 }
 
 /*
@@ -154,7 +87,7 @@ static int init_papi() {
      printf("Error creating/opening file. Output to console only.\n");
      file_open = FAILURE;
    } else file_open = SUCCESS;
-   fprintf(file, "Order,");
+   fprintf(file, "Size,Order,");
    for(i = 0; i < EVENT_COUNT; i++) {
      fprintf(file, "%s,", eventStrings[i]);
    }
@@ -162,47 +95,74 @@ static int init_papi() {
 }
 
 /*
- * Resets all counters in event set and sets return value array to 0.0
+ * Initializes cache buffer by reading size from PAPI and allocating
+ * corresponding space
  */
-static int reset_papi_counters() {
-  int i, retval;
-  if((retval = PAPI_reset(eventSet)) < PAPI_OK) {
-    printf("Error resetting event counters\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    return FAILURE;
+static int init_cache_buffer(void** buffer) {
+  const PAPI_hw_info_t *hw_info = NULL;
+  if ((hw_info = PAPI_get_hardware_info()) == NULL) {
+    printf("\tError: couldn't retrieve cache size.\n");
+    end(FAILURE);
   }
-  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
-  return SUCCESS;
+  int cache_size = (*hw_info).mem_hierarchy.level[0].cache[0].size +
+    (*hw_info).mem_hierarchy.level[0].cache[0].size;
+  *buffer = malloc(cache_size);
+  if(buffer == NULL) {
+    printf("\tError: couldn't allocate cache buffer.\n");
+    end(FAILURE);
+  }
+  return cache_size;
 }
 
 /*
- * Cleans up event set and once empty, destroys it
+ * Clears cache by writing 'x' to every byte
  */
-static int end_papi() {
-  int retval;
-  if((retval = PAPI_cleanup_eventset(eventSet)) < PAPI_OK) {
-    printf("Error clearing event setn\n");
+static void clear_cache(void* buffer, int cache_size) {
+  memset(buffer, 99, (size_t)cache_size);
+}
+
+/*
+ * Initializes PAPI library and event set, adds events listed in eventCode
+ * to event set, and initializes return value array to 0.0
+ */
+static void init_papi() {
+  int i;
+  int retval = PAPI_library_init(PAPI_VER_CURRENT);
+  if(retval != PAPI_VER_CURRENT) {
+    printf("Error initializing PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    return FAILURE;
+    end(FAILURE);
   }
-  if((retval = PAPI_destroy_eventset(&eventSet)) < PAPI_OK) {
-    printf("Error destroying event set\n");
+  if((retval = PAPI_create_eventset(&eventSet)) < PAPI_OK) {
+    printf("Error initializing EventSet to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    return FAILURE;
+    end(FAILURE);
   }
-  eventSet = PAPI_NULL;
-  return SUCCESS;
+  if((retval = PAPI_add_events(eventSet, eventCode, EVENT_COUNT)) < PAPI_OK) {
+    printf("Error adding events to PAPI\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
+  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
+}
+
+/*
+ * Clears PAPI results array
+ */
+static inline void clear_papi_values() {
+  int i;
+  for(i = 0; i < EVENT_COUNT; i++) values[i] = 0.0;
 }
 
 /*
  * Output events to screen and write to .csv file for aggregation
  */
-static void output_papi_results(int order) {
+static void output_papi_results(int index, int order) {
   int i;
   if(file_open) {
-    fprintf(file, "%s,", orderStrings[order]);
+    fprintf(file, "%d,%s,", index, orderStrings[order]);
   }
-  printf("\nOrder: %s\n", orderStrings[order]);
+  printf("\nSize: %d Order: %s\n", index, orderStrings[order]);
   for(i = 0; i < EVENT_COUNT; i++) {
     printf("%s: %lld\n", eventStrings[i], values[i]);
     fprintf(file, "%lld,", values[i]);
@@ -211,14 +171,122 @@ static void output_papi_results(int order) {
 }
 
 /*
+ * Resets all counters in event set and sets return value array to 0.0
+ */
+static void reset_papi_counters() {
+  int i, retval;
+  if((retval = PAPI_reset(eventSet)) < PAPI_OK) {
+    printf("Error resetting event counters\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
+  clear_papi_values();
+}
+
+/*
+ * Cleans up event set and once empty, destroys it
+ */
+static void end_papi() {
+  int retval;
+  if((retval = PAPI_cleanup_eventset(eventSet)) < PAPI_OK) {
+    printf("Error clearing event setn\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
+  if((retval = PAPI_destroy_eventset(&eventSet)) < PAPI_OK) {
+    printf("Error destroying event set\n");
+    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+    end(FAILURE);
+  }
+  eventSet = PAPI_NULL;
+}
+
+/*
+ * Initializes matrices by allocating memory and returning pointers
+ * in m_struct structure
+ */
+static m_struct init_matrices(int index) {
+  m_struct matrices;
+  matrices.matrixa = alloc_array(index);
+  matrices.matrixb = alloc_array(index);
+  matrices.mresult = alloc_array(index);
+  if(matrices.matrixa == NULL && matrices.matrixb == NULL
+    && matrices.mresult == NULL) {
+      printf("Error: Couldn't initialize matrices\n");
+      end(FAILURE);
+  }
+  load_matrices(matrices, index);
+  return matrices;
+}
+
+/*
+ * Allocates memory for a 2D array
+ */
+static double** alloc_array(int index) {
+double** matrix;
+matrix = (double**) malloc(index * sizeof(double*));
+for (int i = 0; i < index; i++)
+   matrix[i] = (double*) malloc(index * sizeof(double));
+   return matrix;
+}
+
+/*
+ * Zeroes all fields in result matrix and loads random doubles into
+ * matrix a and b
+ */
+static void load_matrices(m_struct matrices, int index) {
+  int i, j;
+  for(i = 0; i < index; i++) {
+    for(j = 0; j < index; j++) {
+      matrices.mresult[i][j] = 0.0;
+      matrices.matrixa[i][j] = matrices.matrixb[i][j] = rand() * (double)1.1;
+    }
+  }
+}
+
+/*
+ * Frees memory resources used by matrices
+ */
+static void free_matrices(m_struct matrices, int index) {
+  int i;
+  for (i = 0; i < index; i++){
+    free(matrices.matrixa[i]);
+    free(matrices.matrixb[i]);
+    free(matrices.mresult[i]);
+  }
+  free(matrices.matrixa);
+  free(matrices.matrixb);
+  free(matrices.mresult);
+  matrices.matrixa = matrices.matrixb = matrices.mresult = NULL;
+}
+
+/*
+ * Multiplies two matrices in specified order
+ */
+static void multiply_matrices(m_struct matrices, int order, int index) {
+  int i, j, k;
+  // // TODO: define matrixa, matrixb, mresult
+  double** matrixa = matrices.matrixa;
+  double** matrixb = matrices.matrixb;
+  double** mresult = matrices.mresult;
+  if(order == IJK)
+    MATRIX_MULTIPLY(i, j, k, index, matrixa, matrixb, mresult)
+  else if(order == IKJ)
+    MATRIX_MULTIPLY(i, k, j, index, matrixa, matrixb, mresult)
+  else if(order == JIK)
+    MATRIX_MULTIPLY(j, i, k, index, matrixa, matrixb, mresult)
+  else if(order == JKI)
+    MATRIX_MULTIPLY(j, k, i, index, matrixa, matrixb, mresult)
+  else if(order == KIJ)
+    MATRIX_MULTIPLY(k, i, j, index, matrixa, matrixb, mresult)
+  else
+    MATRIX_MULTIPLY(k, j, i, index, matrixa, matrixb, mresult)
+}
+
+/*
  * End the program
  */
  static void end(int status) {
-
-   //
-   // TODO: free any memory that might still by malloc'ed
-   //
-
    if(file_open) fclose(file);
    file = NULL;
 
