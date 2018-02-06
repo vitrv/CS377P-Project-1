@@ -6,6 +6,7 @@
 #include <memory.h>
 #include <malloc.h>
 #include "papi.h"
+#include "emmintrin.h"
 
 // Definitions
 #define FAILURE 0
