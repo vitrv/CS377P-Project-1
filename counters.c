@@ -223,7 +223,7 @@ static void init_papi() {
   //   printf("Error initializing multiplexing\n");
   //   printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
   //   end(FAILURE);
-  }
+  // }
   if((retval = PAPI_create_eventset(&eventSet)) < PAPI_OK) {
     printf("Error initializing EventSet to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
