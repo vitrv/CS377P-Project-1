@@ -217,22 +217,24 @@ static void init_papi() {
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     end(FAILURE);
   }
-  PAPI_assign_eventset_component(eventSet, 0);
-  if((retval = PAPI_multiplex_init()) != PAPI_OK) {
-    printf("Error initializing multiplexing\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    end(FAILURE);
+  // TODO: fix this
+  // PAPI_assign_eventset_component(eventSet, 0);
+  // if((retval = PAPI_multiplex_init()) != PAPI_OK) {
+  //   printf("Error initializing multiplexing\n");
+  //   printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+  //   end(FAILURE);
   }
   if((retval = PAPI_create_eventset(&eventSet)) < PAPI_OK) {
     printf("Error initializing EventSet to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     end(FAILURE);
   }
-  if((retval = PAPI_set_multiplex(eventSet)) != PAPI_OK) {
-    printf("Error multiplexing EventSet\n");
-    printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
-    end(FAILURE);
-  }
+  // TODO: fix this
+  // if((retval = PAPI_set_multiplex(eventSet)) != PAPI_OK) {
+  //   printf("Error multiplexing EventSet\n");
+  //   printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+  //   end(FAILURE);
+  // }
   if((retval = PAPI_add_events(eventSet, eventCode, EVENT_COUNT)) < PAPI_OK) {
     printf("Error adding events to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
