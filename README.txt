@@ -31,3 +31,5 @@ L2 data cache accesses: 152540560
 L2 data cache misses: 8070247
 Thread time: 0.416554122 seconds
 Real time: 0.417677282 seconds
+
+NOTE: This data is also output in csv format as 'output.csv'
