@@ -1,3 +1,11 @@
+/*
+ * CS 377P: Programming For Performance
+ * Assignment 1: Performance Counters
+ * Laura Catano, UT EID: lnc652
+ * George Ellis, UT EID: ghe88
+ */
+
+/* Inclusions */
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -10,7 +18,7 @@
 #include "papi.h"
 #include "emmintrin.h"
 
-// Definitions
+/* Definitions */
 #define FAILURE 0
 #define SUCCESS 1
 #define IJK 0
@@ -22,44 +30,47 @@
 #define ORDER_COUNT 6
 #define EVENT_COUNT 4
 #define INDEX_COUNT 8
+#define NANO 1000000000
 
-// Macros
+/* Macros */
 #define MATRIX_MULTIPLY(i, j, k, index, a, b, r) for (i = 0; i < index; i++)  \
  for(j = 0; j < index; j++)                                                   \
   for(k = 0; k < index; k++)                                                  \
     r[i][j] = r[i][j] + a[i][k] * b[k][j];
 
+/* Type Definitions */
 typedef struct m_struct {
   double** matrixa;
   double** matrixb;
   double** mresult;
 } m_struct;
 
-// Function prototypes
+/* Function prototypes */
+// Matrix multiplication - high level
 static void papi_MxM(m_struct matrices, int index, int order, int iteration);
 static void clock_MxM(m_struct matrices, int index, int order);
-
+// I/O initialization
 static void init_file();
 static int init_cache_buffer(void** buffer);
 static void clear_cache(void* buffer, int cache_size);
-
+// Timers
 static void init_timers();
 static void start_timers();
 static void end_timers();
 static void output_time_results();
-
+// PAPI
 static void init_papi();
 static inline void clear_papi_values();
 static void start_papi(int iteration);
 static void stop_papi(int iteration);
 static void output_papi_results(int index, int order, int iteration);
 static void end_papi();
-
+// Matrix multiplication - low level
 static m_struct init_matrices(int index);
 static double** alloc_array(int index);
 static void load_matrices(m_struct matrices, int index);
 static void free_matrices(m_struct matrices, int index);
 static void multiply_matrices(m_struct matrices, int order, int index);
 
-
+// I/O clean up
 static void end(int status) __attribute__((noreturn));

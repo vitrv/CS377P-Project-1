@@ -6,7 +6,6 @@
  */
 
 #include "counters.h"
-#define NANO  1000000000L;
 
 // Globals
 int eventSet = PAPI_NULL;                     // Event set for PAPI
@@ -61,12 +60,14 @@ int main(int argc, char **argv) {
   m_struct matrices;
   void* buffer = NULL;
 
+  // Initialize I/O, PAPI, clocks, and caches
   init_file();
   init_timers();
   eventSet = PAPI_NULL;
   init_papi();
   cache_size = init_cache_buffer(&buffer);
 
+  // Matrix index/loop variant order control
   for(index = 0; index < INDEX_COUNT; index++) {
     for(order = 0; order < ORDER_COUNT; order++) {
       // Initialize matrices
@@ -86,7 +87,6 @@ int main(int argc, char **argv) {
       free_matrices(matrices, indexes[index]);
     }
   }
-
   end_papi();
   end(SUCCESS);
 }
@@ -122,6 +122,7 @@ static void init_file() {
     printf("Error creating/opening file. Output to console only.\n");
     file_open = FAILURE;
   } else file_open = SUCCESS;
+  // Print column headers
   fprintf(file, "Size,Order,");
   for(i = 0; i < EVENT_COUNT; i++) {
     fprintf(file, "%s,", eventStrings1[i]);
@@ -142,8 +143,10 @@ static int init_cache_buffer(void** buffer) {
     printf("\tError: couldn't retrieve cache size.\n");
     end(FAILURE);
   }
+  // Read cache sizes from PAPI data
   int cache_size = (*hw_info).mem_hierarchy.level[0].cache[0].size +
     (*hw_info).mem_hierarchy.level[1].cache[0].size;
+  // Reserve buffer
   *buffer = malloc(cache_size);
   if(buffer == NULL) {
     printf("\tError: couldn't allocate cache buffer.\n");
@@ -189,27 +192,15 @@ static void end_timers() {
  * Outputs time data to console and file
  */
 static void output_time_results() {
-<<<<<<< HEAD
-  // TODO: we have overflow issues here. Needs to be fixed.
-  double thread_elapsed = (thread_time_end.tv_nsec - thread_time_begin.tv_nsec)
-    / (double) 1000000000;
-  double real_elapsed = (real_time_end.tv_nsec - real_time_begin.tv_nsec)
-    / (double) 1000000000;
-=======
-
-  double thread_ns = (double)(thread_time_end.tv_nsec - thread_time_begin.tv_nsec) / NANO;
-  double real_ns =  (double)(real_time_end.tv_nsec - real_time_begin.tv_nsec) / NANO;
-
   double thread_elapsed = (thread_time_end.tv_sec - thread_time_begin.tv_sec) +
-                        thread_ns;
-  double real_elapsed = (real_time_end.tv_sec - real_time_begin.tv_sec)
-                      + real_ns;
->>>>>>> 32b2d7b6811d48deeaa1de6b2e021d90497e318c
+    (thread_time_end.tv_nsec - thread_time_begin.tv_nsec) / (double) NANO;
+  double real_elapsed = (real_time_end.tv_sec - real_time_begin.tv_sec) +
+    (real_time_end.tv_nsec - real_time_begin.tv_nsec) / (double) NANO;
   if(file_open) {
-    fprintf(file, "%lf,%lf\n", thread_elapsed, real_elapsed);
+    fprintf(file, "%.9f,%.9f\n", thread_elapsed, real_elapsed);
   }
-  printf("Thread time: %lf seconds\n", thread_elapsed);
-  printf("Real time: %lf seconds\n", real_elapsed);
+  printf("Thread time: %.9f seconds\n", thread_elapsed);
+  printf("Real time: %.9f seconds\n", real_elapsed);
 }
 
 /*
@@ -245,7 +236,7 @@ static inline void clear_papi_values() {
 static void start_papi(int iteration) {
   int retval;
   if((retval = PAPI_add_events(eventSet,
-    iteration == 0 ? eventCode1 : eventCode2, EVENT_COUNT)) < PAPI_OK) {
+      iteration == 0 ? eventCode1 : eventCode2, EVENT_COUNT)) < PAPI_OK) {
     printf("Error adding events to PAPI\n");
     printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
     end(FAILURE);
@@ -275,7 +266,7 @@ static void output_papi_results(int index, int order, int iteration) {
     if(file_open) {
       fprintf(file, "%d,%s,", index, orderStrings[order]);
     }
-    printf("\n\t\t=== Size: %d Order: %s===\n", index, orderStrings[order]);
+    printf("\n\t\t=== Size: %d Order: %s ===\n", index, orderStrings[order]);
   }
   for(i = 0; i < EVENT_COUNT; i++) {
     printf("%s: %lld\n",
@@ -324,11 +315,11 @@ static m_struct init_matrices(int index) {
  * Allocates memory for a 2D array
  */
 static double** alloc_array(int index) {
-double** matrix;
-matrix = (double**) malloc(index * sizeof(double*));
-for (int i = 0; i < index; i++)
-   matrix[i] = (double*) malloc(index * sizeof(double));
-   return matrix;
+  double** matrix;
+  matrix = (double**) malloc(index * sizeof(double*));
+  for (int i = 0; i < index; i++)
+     matrix[i] = (double*) malloc(index * sizeof(double));
+     return matrix;
 }
 
 /*
