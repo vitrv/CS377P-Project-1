@@ -353,32 +353,24 @@ static void free_matrices(m_struct matrices, int index) {
 }
 
 /*
- * Multiplies two matrices in specified order
+ * Multiplies two matrices in specified order, first memory fencing and
+ * executing a CPU serializing instruction
  */
 static void multiply_matrices(m_struct matrices, int order, int index) {
-  // TODO: memory fence these operations
+  // These variable names must *not* change
   int i, j, k;
-  double** matrixa = matrices.matrixa;
-  double** matrixb = matrices.matrixb;
-  double** mresult = matrices.mresult;
-
+  double** a = matrices.matrixa;
+  double** b = matrices.matrixb;
+  double** r = matrices.mresult;
   unsigned level, eax, ebx, ecx, edx;
   eax = level = 0;
-  _mm_mfence();
-  __get_cpuid(level, &eax, &ebx, &ecx, &edx);
 
-  if(order == IJK)
-    MATRIX_MULTIPLY(i, j, k, index, matrixa, matrixb, mresult)
-  else if(order == IKJ)
-    MATRIX_MULTIPLY(i, k, j, index, matrixa, matrixb, mresult)
-  else if(order == JIK)
-    MATRIX_MULTIPLY(j, i, k, index, matrixa, matrixb, mresult)
-  else if(order == JKI)
-    MATRIX_MULTIPLY(j, k, i, index, matrixa, matrixb, mresult)
-  else if(order == KIJ)
-    MATRIX_MULTIPLY(k, i, j, index, matrixa, matrixb, mresult)
-  else
-    MATRIX_MULTIPLY(k, j, i, index, matrixa, matrixb, mresult)
+  if(order == IJK)      LOOP_IJK
+  else if(order == IKJ) LOOP_IKJ
+  else if(order == JIK) LOOP_JIK
+  else if(order == JKI) LOOP_JKI
+  else if(order == KIJ) LOOP_KIJ
+  else                  LOOP_KJI
 }
 
 /*

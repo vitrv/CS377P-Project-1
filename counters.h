@@ -33,10 +33,28 @@
 #define NANO 1000000000
 
 /* Macros */
-#define MATRIX_MULTIPLY(i, j, k, index, a, b, r) for (i = 0; i < index; i++)  \
- for(j = 0; j < index; j++)                                                   \
-  for(k = 0; k < index; k++)                                                  \
-    r[i][j] = r[i][j] + a[i][k] * b[k][j];
+#define FENCE _mm_mfence(); __get_cpuid(level, &eax, &ebx, &ecx, &edx);        \
+
+#define SINGLE_MULT r[i][j] = r[i][j] + a[i][k] * b[k][j]; }
+
+#define LOOP_IJK { FENCE for (i = 0; i < index; i++) for(j = 0; j < index; j++)\
+  for(k = 0; k < index; k++) SINGLE_MULT
+
+#define LOOP_IKJ { FENCE for (i = 0; i < index; i++) for(k = 0; k < index; k++)\
+  for(j = 0; j < index; j++) SINGLE_MULT
+
+#define LOOP_JIK { FENCE for (j = 0; j < index; j++) for(i = 0; i < index; i++)\
+  for(k = 0; k < index; k++) SINGLE_MULT
+
+#define LOOP_JKI { FENCE for (j = 0; j < index; j++) for(k = 0; k < index; k++)\
+  for(i = 0; i < index; i++) SINGLE_MULT
+
+#define LOOP_KIJ { FENCE for (k = 0; k < index; k++) for(i = 0; i < index; i++)\
+  for(j = 0; j < index; j++) SINGLE_MULT
+
+#define LOOP_KJI { FENCE for (k = 0; k < index; k++) for(j = 0; j < index; j++)\
+  for(i = 0; i < index; i++) SINGLE_MULT
+
 
 /* Type Definitions */
 typedef struct m_struct {
