@@ -6,6 +6,7 @@
  */
 
 #include "counters.h"
+#define NANO  1000000000L;
 
 // Globals
 int eventSet = PAPI_NULL;                     // Event set for PAPI
@@ -188,16 +189,27 @@ static void end_timers() {
  * Outputs time data to console and file
  */
 static void output_time_results() {
+<<<<<<< HEAD
   // TODO: we have overflow issues here. Needs to be fixed.
   double thread_elapsed = (thread_time_end.tv_nsec - thread_time_begin.tv_nsec)
     / (double) 1000000000;
   double real_elapsed = (real_time_end.tv_nsec - real_time_begin.tv_nsec)
     / (double) 1000000000;
+=======
+
+  double thread_ns = (double)(thread_time_end.tv_nsec - thread_time_begin.tv_nsec) / NANO;
+  double real_ns =  (double)(real_time_end.tv_nsec - real_time_begin.tv_nsec) / NANO;
+
+  double thread_elapsed = (thread_time_end.tv_sec - thread_time_begin.tv_sec) +
+                        thread_ns;
+  double real_elapsed = (real_time_end.tv_sec - real_time_begin.tv_sec)
+                      + real_ns;
+>>>>>>> 32b2d7b6811d48deeaa1de6b2e021d90497e318c
   if(file_open) {
-    fprintf(file, "%f,%f\n", thread_elapsed, real_elapsed);
+    fprintf(file, "%lf,%lf\n", thread_elapsed, real_elapsed);
   }
-  printf("Thread time: %f seconds\n", thread_elapsed);
-  printf("Real time: %f seconds\n", real_elapsed);
+  printf("Thread time: %lf seconds\n", thread_elapsed);
+  printf("Real time: %lf seconds\n", real_elapsed);
 }
 
 /*
